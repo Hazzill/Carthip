@@ -8,9 +8,59 @@ import Image from 'next/image';
 import { useLiffContext } from '@/context/LiffProvider';
 import { cancelBookingByUser } from '@/app/actions/bookingActions';
 
+// --- Notification Component ---
+const Notification = ({ show, title, message, type }) => {
+    if (!show) return null;
+    const icons = {
+        success: (
+            <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        ),
+        error: (
+            <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        ),
+    };
+    const colors = {
+        success: 'bg-green-50 border-green-200 text-green-800',
+        error: 'bg-red-50 border-red-200 text-red-800',
+    };
+    return (
+        <div className={`fixed top-5 left-1/2 -translate-x-1/2 w-11/12 max-w-md p-4 rounded-lg border shadow-lg z-50 ${colors[type]}`}>
+            <div className="flex items-start">
+                <div className="flex-shrink-0">{icons[type]}</div>
+                <div className="ml-3">
+                    <h3 className="text-sm font-bold">{title}</h3>
+                    {message && <div className="mt-1 text-sm">{message}</div>}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Confirmation Modal ---
+const ConfirmationModal = ({ show, title, message, onConfirm, onCancel, isProcessing }) => {
+    if (!show) return null;
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
+            <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+                <h2 className="text-lg font-bold mb-2">{title}</h2>
+                <p className="text-sm text-gray-600 mb-6">{message}</p>
+                <div className="flex justify-end space-x-3">
+                    <button onClick={onCancel} className="px-4 py-2 bg-gray-200 rounded-md font-semibold">ยกเลิก</button>
+                    <button onClick={onConfirm} disabled={isProcessing} className="px-4 py-2 bg-red-600 text-white rounded-md font-semibold disabled:bg-gray-400">
+                        {isProcessing ? 'กำลังดำเนินการ...' : 'ยืนยัน'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 // --- Helper Components ---
-
 const statusConfig = {
     'pending': { text: 'รอการยืนยัน', progress: 10, color: 'bg-yellow-500' },
     'confirmed': { text: 'ยืนยันแล้ว', progress: 20, color: 'bg-blue-500' },
@@ -26,8 +76,8 @@ const ProgressBar = ({ status }) => {
     const config = statusConfig[status] || { progress: 0, color: 'bg-gray-400' };
     return (
         <div className="w-full bg-gray-100 rounded-full h-1.5">
-            <div 
-                className={`h-1.5 rounded-full transition-all duration-500 ${config.color}`} 
+            <div
+                className={`h-1.5 rounded-full transition-all duration-500 ${config.color}`}
                 style={{ width: `${config.progress}%` }}
             ></div>
         </div>
@@ -36,7 +86,13 @@ const ProgressBar = ({ status }) => {
 
 const BookingCard = ({ job, onCancel, isCancelling }) => {
     const handleReportIssue = () => {
-        alert("ฟังก์ชัน 'แจ้งเรื่อง' ยังไม่ถูกนำไปใช้งาน");
+        // This can be replaced with a proper notification
+        onCancel.showNotification({
+            show: true,
+            title: 'ฟังก์ชันยังไม่พร้อม',
+            message: "ฟังก์ชัน 'แจ้งเรื่อง' กำลังอยู่ในระหว่างการพัฒนา",
+            type: 'error'
+        });
     };
 
     const pickupDateTime = job.pickupInfo.dateTime.toDate();
@@ -117,7 +173,7 @@ const BookingCard = ({ job, onCancel, isCancelling }) => {
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                onCancel(job.id);
+                                onCancel.openModal(job.id);
                             }}
                             disabled={isCancelling}
                             className="text-sm bg-red-500 text-white font-bold py-2 px-4 rounded-full hover:bg-red-600 transition-colors disabled:bg-gray-400"
@@ -143,6 +199,17 @@ export default function MyBookingsPage() {
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isCancelling, setIsCancelling] = useState(false);
+    const [notification, setNotification] = useState({ show: false, title: '', message: '', type: 'success' });
+    const [cancelModal, setCancelModal] = useState({ show: false, bookingId: null });
+
+    useEffect(() => {
+        if (notification.show) {
+            const timer = setTimeout(() => {
+                setNotification({ show: false, title: '', message: '', type: 'success' });
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [notification]);
 
     useEffect(() => {
         if (liffLoading || !profile?.userId) {
@@ -151,7 +218,6 @@ export default function MyBookingsPage() {
         }
 
         setLoading(true);
-        // --- แก้ไข: ดึงเฉพาะงานที่กำลังดำเนินอยู่ ---
         const bookingsQuery = query(
             collection(db, 'bookings'),
             where("userId", "==", profile.userId),
@@ -170,13 +236,8 @@ export default function MyBookingsPage() {
                 }
                 return job;
             }));
-            
-            bookingsData.sort((a, b) => {
-                const dateA = a.createdAt?.toDate() || 0;
-                const dateB = b.createdAt?.toDate() || 0;
-                return dateB - dateA;
-            });
 
+            bookingsData.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
             setBookings(bookingsData);
             setLoading(false);
         }, (error) => {
@@ -187,28 +248,25 @@ export default function MyBookingsPage() {
         return () => unsubscribe();
     }, [profile, liffLoading]);
 
-    const handleCancelBooking = async (bookingId) => {
-        if (!profile || !profile.userId) {
-            alert("เกิดข้อผิดพลาด: ไม่สามารถระบุข้อมูลผู้ใช้ได้ กรุณาลองอีกครั้ง");
+    const handleCancelBooking = async () => {
+        if (!cancelModal.bookingId || !profile || !profile.userId) {
+            setNotification({ show: true, title: 'เกิดข้อผิดพลาด', message: 'ไม่สามารถระบุข้อมูลที่จำเป็นได้', type: 'error' });
             return;
         }
-        if (isCancelling) return;
 
-        if (window.confirm("คุณต้องการยกเลิกการจองนี้ใช่หรือไม่?")) {
-            setIsCancelling(true);
-            try {
-                const result = await cancelBookingByUser(bookingId, profile.userId);
-                if (result.success) {
-                    alert("การจองของคุณถูกยกเลิกเรียบร้อยแล้ว");
-                } else {
-                    throw new Error(result.error);
-                }
-            } catch (error) {
-                console.error("Failed to cancel booking:", error);
-                alert(`เกิดข้อผิดพลาด: ${error.message}`);
-            } finally {
-                setIsCancelling(false);
+        setIsCancelling(true);
+        try {
+            const result = await cancelBookingByUser(cancelModal.bookingId, profile.userId);
+            if (result.success) {
+                setNotification({ show: true, title: 'สำเร็จ', message: 'การจองของคุณถูกยกเลิกแล้ว', type: 'success' });
+            } else {
+                throw new Error(result.error);
             }
+        } catch (error) {
+            setNotification({ show: true, title: 'เกิดข้อผิดพลาด', message: error.message, type: 'error' });
+        } finally {
+            setIsCancelling(false);
+            setCancelModal({ show: false, bookingId: null });
         }
     };
 
@@ -221,13 +279,22 @@ export default function MyBookingsPage() {
 
     return (
         <div className="space-y-5">
+            <Notification {...notification} />
+            <ConfirmationModal
+                show={cancelModal.show}
+                title="ยืนยันการยกเลิก"
+                message="คุณต้องการยกเลิกการจองนี้ใช่หรือไม่?"
+                onConfirm={handleCancelBooking}
+                onCancel={() => setCancelModal({ show: false, bookingId: null })}
+                isProcessing={isCancelling}
+            />
+
             <div className="flex items-center space-x-3">
                 <Link href="/booking" className="w-full bg-white text-primary rounded-full py-4 text-center font-semibold shadow">
                     จองรถ
                 </Link>
             </div>
-            
-            {/* --- แก้ไข: เปลี่ยนจาก Tabs เป็น Navigation Bar --- */}
+
             <div className="flex bg-white rounded-full shadow-sm p-1">
                 <button className="w-1/2 bg-slate-800 text-white rounded-full py-2 font-semibold">
                     รายการจองของฉัน
@@ -246,11 +313,14 @@ export default function MyBookingsPage() {
                     </div>
                 ) : (
                     bookings.map(job => (
-                        <BookingCard 
-                            key={job.id} 
-                            job={job} 
-                            onCancel={handleCancelBooking} 
-                            isCancelling={isCancelling} 
+                        <BookingCard
+                            key={job.id}
+                            job={job}
+                            onCancel={{
+                                openModal: (bookingId) => setCancelModal({ show: true, bookingId }),
+                                showNotification: setNotification
+                            }}
+                            isCancelling={isCancelling && cancelModal.bookingId === job.id}
                         />
                     ))
                 )}

@@ -3,10 +3,10 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore'; // Removed addDoc, setDoc, collection, serverTimestamp, GeoPoint
+import { doc, getDoc } from 'firebase/firestore';
 import Image from 'next/image';
 import { useLiffContext } from '@/context/LiffProvider';
-import { createBookingWithCheck } from '@/app/actions/bookingActions'; // Import the new server action
+import { createBookingWithCheck } from '@/app/actions/bookingActions';
 
 // --- UI Helper Components ---
 const InfoCard = ({ title, children }) => (
@@ -33,7 +33,41 @@ const FormInput = ({ placeholder, value, onChange, type = 'text', required = tru
         className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
     />
 );
-// --- End UI Helper Components ---
+
+// --- Notification Component ---
+const Notification = ({ show, title, message, type }) => {
+    if (!show) return null;
+
+    const icons = {
+        success: (
+            <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        ),
+        error: (
+            <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        ),
+    };
+
+    const colors = {
+        success: 'bg-green-50 border-green-200 text-green-800',
+        error: 'bg-red-50 border-red-200 text-red-800',
+    };
+
+    return (
+        <div className={`fixed top-5 left-1/2 -translate-x-1/2 w-11/12 max-w-md p-4 rounded-lg border shadow-lg z-50 ${colors[type]}`}>
+            <div className="flex items-start">
+                <div className="flex-shrink-0">{icons[type]}</div>
+                <div className="ml-3">
+                    <h3 className="text-sm font-bold">{title}</h3>
+                    {message && <div className="mt-1 text-sm">{message}</div>}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 
 function ConfirmPageContent() {
@@ -45,9 +79,20 @@ function ConfirmPageContent() {
     const [totalPrice, setTotalPrice] = useState(0);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [notification, setNotification] = useState({ show: false, title: '', message: '', type: 'success' });
     
     const router = useRouter();
     const searchParams = useSearchParams();
+
+    // Effect to handle notification visibility
+    useEffect(() => {
+        if (notification.show) {
+            const timer = setTimeout(() => {
+                setNotification({ show: false, title: '', message: '', type: '' });
+            }, 5000); // Hide after 5 seconds
+            return () => clearTimeout(timer);
+        }
+    }, [notification]);
 
     // Effect to fetch existing customer data
     useEffect(() => {
@@ -111,7 +156,7 @@ function ConfirmPageContent() {
                     throw new Error("ไม่พบข้อมูลรถ");
                 }
             } catch (err) {
-                alert(err.message);
+                 setNotification({ show: true, title: 'เกิดข้อผิดพลาด', message: err.message, type: 'error' });
                 router.push('/booking');
             } finally {
                 setLoading(false);
@@ -119,18 +164,17 @@ function ConfirmPageContent() {
         };
         fetchVehicle();
     }, [searchParams, router, liffLoading]);
-    
+
     const handleConfirmBooking = async () => {
         if (!profile?.userId) {
-            alert("ไม่สามารถระบุตัวตนผู้ใช้ได้"); return;
+            setNotification({ show: true, title: 'เกิดข้อผิดพลาด', message: "ไม่สามารถระบุตัวตนผู้ใช้ได้", type: 'error' }); return;
         }
         if (!customerInfo.name || !customerInfo.phone) {
-            alert("กรุณากรอกชื่อและเบอร์โทรศัพท์ให้ครบถ้วน"); return;
+            setNotification({ show: true, title: 'ข้อมูลไม่ครบถ้วน', message: "กรุณากรอกชื่อและเบอร์โทรศัพท์", type: 'error' }); return;
         }
         
         setIsSubmitting(true);
         
-        // Prepare the data payload for the server action
         const finalBookingData = {
             userId: profile.userId,
             userInfo: { displayName: profile.displayName, pictureUrl: profile.pictureUrl || '' },
@@ -146,7 +190,7 @@ function ConfirmPageContent() {
             pickupInfo: {
                 name: bookingDetails.originName || bookingDetails.originAddress,
                 address: bookingDetails.originAddress,
-                dateTime: new Date(bookingDetails.pickupDateTime).toISOString(), // Send as ISO string
+                dateTime: new Date(bookingDetails.pickupDateTime).toISOString(),
                 latlng: {
                     latitude: parseFloat(bookingDetails.originLat),
                     longitude: parseFloat(bookingDetails.originLng),
@@ -175,19 +219,17 @@ function ConfirmPageContent() {
         };
 
         try {
-            // Call the server action to create the booking with a transaction check
             const result = await createBookingWithCheck(finalBookingData);
 
             if (result.success) {
-                alert("ทำการจองเรียบร้อยแล้ว!");
-                router.push('/my-bookings');
+                setNotification({ show: true, title: 'การจองสำเร็จ!', message: 'ระบบได้บันทึกข้อมูลของคุณแล้ว', type: 'success' });
+                setTimeout(() => router.push('/my-bookings'), 2000);
             } else {
-                // Display the specific error message from the server (e.g., "Vehicle is already booked")
-                alert(result.error);
+                setNotification({ show: true, title: 'เกิดข้อผิดพลาด', message: result.error, type: 'error' });
             }
         } catch (error) {
             console.error("Error confirming booking: ", error);
-            alert("เกิดข้อผิดพลาดในการยืนยันการจอง: " + error.message);
+            setNotification({ show: true, title: 'เกิดข้อผิดพลาดรุนแรง', message: error.message, type: 'error' });
         } finally {
             setIsSubmitting(false);
         }
@@ -199,6 +241,13 @@ function ConfirmPageContent() {
 
     return (
         <main className="space-y-4">
+            <Notification 
+                show={notification.show}
+                title={notification.title}
+                message={notification.message}
+                type={notification.type}
+            />
+            
             {/* Vehicle Summary */}
             <div className="bg-gray-100 rounded-2xl  p-4 flex items-center space-x-4">
                 <div className="relative w-24 h-20 flex-shrink-0">

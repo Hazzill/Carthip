@@ -11,6 +11,33 @@ const UserIcon = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" viewBox="0
 const BagIcon = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="20" height="14" x="2" y="7" rx="2" ry="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg> );
 const ClockIcon = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg> );
 
+// --- Notification Component ---
+const Notification = ({ show, title, message, type }) => {
+    if (!show) return null;
+
+    const icons = {
+        error: (
+            <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        ),
+    };
+    const colors = {
+        error: 'bg-red-50 border-red-200 text-red-800',
+    };
+    return (
+        <div className={`fixed top-5 left-1/2 -translate-x-1/2 w-11/12 max-w-md p-4 rounded-lg border shadow-lg z-50 ${colors[type]}`}>
+            <div className="flex items-start">
+                <div className="flex-shrink-0">{icons[type]}</div>
+                <div className="ml-3">
+                    <h3 className="text-sm font-bold">{title}</h3>
+                    {message && <div className="mt-1 text-sm">{message}</div>}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- Helper Components ---
 const NumberInput = ({ label, value, onValueChange }) => (
     <div className="flex bg-gray-100 rounded-full flex-1 items-center justify-between px-4 py-3">
@@ -82,14 +109,24 @@ function SelectVehicleContent() {
     const [allVehicles, setAllVehicles] = useState([]);
     const [vehicleBookings, setVehicleBookings] = useState({});
     const [filteredVehicles, setFilteredVehicles] = useState([]);
-    const [passengers, setPassengers] = useState('1'); // <-- ค่าเริ่มต้นใหม่
-    const [bags, setBags] = useState('0'); // <-- ค่าเริ่มต้นใหม่
-    const [rentalHours, setRentalHours] = useState('4'); // <-- ค่าเริ่มต้นใหม่
+    const [passengers, setPassengers] = useState('1');
+    const [bags, setBags] = useState('0');
+    const [rentalHours, setRentalHours] = useState('4');
     const [vehicleClasses, setVehicleClasses] = useState(["All"]);
     const [selectedClass, setSelectedClass] = useState("All");
     const [loading, setLoading] = useState(true);
     const router = useRouter();
     const searchParams = useSearchParams();
+    const [notification, setNotification] = useState({ show: false, title: '', message: '', type: 'error' });
+
+    useEffect(() => {
+        if (notification.show) {
+            const timer = setTimeout(() => {
+                setNotification({ show: false, title: '', message: '', type: 'error' });
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [notification]);
 
     const bookingParams = useMemo(() => ({
         pickupDateTime: searchParams.get('pickupDateTime'),
@@ -116,7 +153,7 @@ function SelectVehicleContent() {
                 setVehicleClasses(["All", ...classesFromDB.sort()]);
             } catch (err) {
                 console.error("Error fetching vehicle data:", err);
-                alert("เกิดข้อผิดพลาดในการโหลดข้อมูลรถ: " + err.message);
+                setNotification({ show: true, title: 'เกิดข้อผิดพลาด', message: 'ไม่สามารถโหลดข้อมูลรถได้', type: 'error' });
             } finally {
                 setLoading(false);
             }
@@ -171,11 +208,11 @@ function SelectVehicleContent() {
         const finalRentalHours = Number(rentalHours) || 0;
 
         if (finalPassengers < 1) {
-            alert('จำนวนคนต้องมีค่าอย่างน้อย 1');
+            setNotification({ show: true, title: 'ข้อมูลไม่ถูกต้อง', message: 'จำนวนผู้โดยสารต้องมีค่าอย่างน้อย 1 คน', type: 'error' });
             return;
         }
         if (finalRentalHours < 1) {
-            alert('จำนวนชั่วโมงต้องมีค่าอย่างน้อย 1');
+            setNotification({ show: true, title: 'ข้อมูลไม่ถูกต้อง', message: 'จำนวนชั่วโมงต้องมีค่าอย่างน้อย 1 ชั่วโมง', type: 'error' });
             return;
         }
 
@@ -193,6 +230,7 @@ function SelectVehicleContent() {
 
     return (
         <main className="space-y-5">
+            <Notification {...notification} />
             <div className="flex items-center gap-2">
                 <NumberInput label="คน" value={passengers} onValueChange={setPassengers} />
                 <NumberInput label="กระเป๋า" value={bags} onValueChange={setBags} />

@@ -72,8 +72,8 @@ export default function BookingHistoryPage() {
     }
 
     return (
-        <main className="p-4 space-y-4">
-            <div className="flex bg-white rounded-full shadow-sm p-1">
+        <main className="space-y-4">
+            <div className="flex bg-gray-100 rounded-full shadow-sm p-1">
                 <Link href="../my-bookings" className="w-1/2 text-center py-2 text-gray-600 font-semibold">
                     รายการจองของฉัน
                 </Link>
@@ -89,7 +89,7 @@ export default function BookingHistoryPage() {
             ) : (
                 <div className="space-y-4">
                     {historyBookings.map(job => (
-                        <div key={job.id} className="bg-white rounded-lg shadow p-4 opacity-90">
+                        <div key={job.id} className="bg-gray-100 rounded-lg shadow p-4 opacity-90">
                             <div className="flex justify-between items-start mb-2">
                                 <div>
                                     <p className="font-bold text-gray-800">

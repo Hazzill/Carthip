@@ -21,6 +21,32 @@ import { db } from '@/app/lib/firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { useLiffContext } from '@/context/LiffProvider';
 
+// --- Notification Component ---
+const Notification = ({ show, title, message, type }) => {
+    if (!show) return null;
+    const icons = {
+        error: (
+            <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        ),
+    };
+    const colors = {
+        error: 'bg-red-50 border-red-200 text-red-800',
+    };
+    return (
+        <div className={`fixed top-5 left-1/2 -translate-x-1/2 w-11/12 max-w-md p-4 rounded-lg border shadow-lg z-50 ${colors[type]}`}>
+            <div className="flex items-start">
+                <div className="flex-shrink-0">{icons[type]}</div>
+                <div className="ml-3">
+                    <h3 className="text-sm font-bold">{title}</h3>
+                    {message && <div className="mt-1 text-sm">{message}</div>}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 function BookingStepOneContent() {
     const { loading: liffLoading } = useLiffContext();
@@ -35,6 +61,16 @@ function BookingStepOneContent() {
 
     const [selectedDate, setSelectedDate] = useState(null);
     const [selectedTime, setSelectedTime] = useState(null);
+    const [notification, setNotification] = useState({ show: false, title: '', message: '', type: 'error' });
+
+    useEffect(() => {
+        if (notification.show) {
+            const timer = setTimeout(() => {
+                setNotification({ show: false, title: '', message: '', type: 'error' });
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [notification]);
 
     useEffect(() => {
         const fetchLocations = async () => {
@@ -71,7 +107,7 @@ function BookingStepOneContent() {
 
     const handleNextStep = () => {
         if (!origin || !destination || !selectedDate || !selectedTime) {
-            alert("กรุณาเลือกข้อมูลการเดินทางให้ครบถ้วน");
+            setNotification({ show: true, title: 'ข้อมูลไม่ครบถ้วน', message: 'กรุณาเลือกข้อมูลการเดินทางให้ครบถ้วน', type: 'error' });
             return;
         }
 
@@ -84,24 +120,16 @@ function BookingStepOneContent() {
         );
 
         if (combinedDateTime < new Date()) {
-            alert("ไม่สามารถเลือกวันและเวลาในอดีตได้");
+            setNotification({ show: true, title: 'เลือกเวลาไม่ถูกต้อง', message: 'ไม่สามารถเลือกวันและเวลาในอดีตได้', type: 'error' });
             return;
         }
 
-        // --- REMOVED: บรรทัดเดิมที่ทำให้เกิดปัญหา ---
-        // const formattedDateTime = combinedDateTime.toISOString().substring(0, 16);
-
-        // +++ ADDED: วิธีแก้ไข - สร้าง Date String ด้วยตนเองเพื่อเลี่ยงการแปลง Timezone +++
         const year = combinedDateTime.getFullYear();
-        // getMonth() คืนค่า 0-11, จึงต้อง +1 และ padStart เพื่อให้เป็น 2 หลัก (เช่น 08)
         const month = String(combinedDateTime.getMonth() + 1).padStart(2, '0');
         const day = String(combinedDateTime.getDate()).padStart(2, '0');
         const hours = String(combinedDateTime.getHours()).padStart(2, '0');
         const minutes = String(combinedDateTime.getMinutes()).padStart(2, '0');
-
-        // ได้ผลลัพธ์ในรูปแบบ "YYYY-MM-DDTHH:mm" ตามเวลาท้องถิ่นที่เลือก
         const formattedDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
-
 
         const params = new URLSearchParams({
             originName: origin.name,
@@ -111,33 +139,29 @@ function BookingStepOneContent() {
             destAddress: destination.address,
             destLat: destination.lat,
             destLng: destination.lng,
-            pickupDateTime: formattedDateTime, // ส่งค่าที่ถูกต้องไป
+            pickupDateTime: formattedDateTime,
         });
         router.push(`booking/select-vehicle?${params.toString()}`);
     };
 
     if (liffLoading || loading) return <div className="p-4 text-center">กำลังโหลด...</div>;
 
-    // === CHANGED: ลบ LocalizationProvider และใช้ main tag โดยตรง ===
     return (
         <main className="space-y-4">
+            <Notification {...notification} /> 
             <div className="bg-gray-100 p-4 rounded-2xl">
                 <label className="block text-sm font-medium text-gray-700 mb-2">ช่วงเวลารับ</label>
-                {/* === CHANGED: เปลี่ยนจาก Stack ของ MUI เป็น div + flexbox === */}
                 <div className="flex space-x-2">
-                    {/* === CHANGED: เปลี่ยนเป็น react-datepicker === */}
                     <DatePicker
                         selected={selectedDate}
                         onChange={(date) => setSelectedDate(date)}
                         locale="th"
                         dateFormat="dd/MM/yyyy"
                         placeholderText="วันที่"
-                        minDate={new Date()} // ไม่ให้เลือกวันในอดีต
+                        minDate={new Date()}
                         className="w-full p-2 border border-gray-200 rounded-full bg-white text-center focus:ring-primary focus:border-primary"
                         wrapperClassName="w-full"
                     />
-
-                    {/* === CHANGED: เปลี่ยนเป็น react-datepicker สำหรับเลือกเวลา === */}
                     <DatePicker
                         selected={selectedTime}
                         onChange={(date) => setSelectedTime(date)}
@@ -183,7 +207,10 @@ function BookingStepOneContent() {
                 <BookingMap onLocationSelect={handleLocationSelect} />
             </div>
 
-            <button onClick={handleNextStep} disabled={!origin || !destination || !selectedDate || !selectedTime} className="w-full mt-4 p-3 bg-primary text-white rounded-full font-bold text-lg disabled:bg-gray-400">
+            <button 
+                onClick={handleNextStep}
+                className="w-full mt-4 p-3 bg-primary text-white rounded-full font-bold text-lg hover:bg-gray-700 transition disabled:bg-gray-400"
+            >
                 ค้นหารถ
             </button>
         </main>
