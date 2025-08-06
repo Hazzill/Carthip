@@ -2,6 +2,7 @@
 
 import { db } from '@/app/lib/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { sendLineMessage } from './lineActions'; // [!code focus]
 
 /**
  * Submits a review for a completed booking.
@@ -56,6 +57,12 @@ export async function submitReview(reviewData) {
         updatedAt: FieldValue.serverTimestamp(),
       });
     });
+
+    // [!code focus start]
+    // ส่งข้อความขอบคุณหลังจากบันทึกรีวิวสำเร็จ
+    const thankYouMessage = 'ขอบคุณสำหรับรีวิวครับ! ความคิดเห็นของคุณมีความสำคัญอย่างยิ่งในการพัฒนาบริการของเราให้ดียิ่งขึ้นไปครับ';
+    await sendLineMessage(userId, thankYouMessage);
+    // [!code focus end]
 
     return { success: true };
   } catch (error) {
