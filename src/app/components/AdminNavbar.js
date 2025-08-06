@@ -37,13 +37,75 @@ function formatTimeAgo(timestamp) {
   return date.toLocaleDateString("th-TH");
 }
 
+// --- Nav Links with Grouping ---
 const navLinks = [
   { name: "Dashboard", href: "/dashboard" },
-  { name: "จัดการรถ", href: "/vehicles" },
-  { name: "จัดการคนขับ", href: "/drivers" },
-  { name: "จัดการสถานที่", href: "/locations" },
+  { name: "Analytics", href: "/analytics" },
+  {
+    name: "จัดการข้อมูล",
+    items: [
+      { name: "จัดการรถ", href: "/vehicles" },
+      { name: "จัดการคนขับ", href: "/drivers" },
+      { name: "จัดการสถานที่", href: "/locations" },
+    ]
+  },
+  {
+    name: "การเงินและรีวิว",
+    items: [
+      { name: "รายการชำระเงิน", href: "/payments" },
+      { name: "รีวิวลูกค้า", href: "/reviews" },
+    ]
+  },
   { name: "ลงทะเบียน", href: "/register-staff" },
 ];
+
+const NavLink = ({ link, currentPath }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+  useClickOutside(dropdownRef, () => setIsOpen(false));
+
+  const isActive = link.items ? link.items.some(item => currentPath.startsWith(item.href)) : currentPath === link.href;
+
+  if (link.items) {
+    return (
+      <div className="relative" ref={dropdownRef}>
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className={`px-3 py-2 rounded-md text-sm font-medium flex items-center gap-1 ${isActive ? "bg-slate-800 text-white" : "text-gray-600 hover:bg-gray-100"
+            }`}
+        >
+          {link.name}
+          <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
+        {isOpen && (
+          <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20 border">
+            {link.items.map(item => (
+              <Link
+                key={item.name}
+                href={item.href}
+                onClick={() => setIsOpen(false)}
+                className={`block px-4 py-2 text-sm ${currentPath === item.href ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+              >
+                {item.name}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <Link
+      href={link.href}
+      className={`px-3 py-2 rounded-md text-sm font-medium ${isActive ? "bg-slate-800 text-white" : "text-gray-600 hover:bg-gray-100"
+        }`}
+    >
+      {link.name}
+    </Link>
+  )
+}
 
 export default function AdminNavbar({
   notifications,
@@ -76,23 +138,13 @@ export default function AdminNavbar({
       <div className="container mx-auto px-4 md:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
-            <Link href="/dashboard"  className="text-xl font-bold text-slate-800" >
+            <Link href="/dashboard" className="text-xl font-bold text-slate-800" >
               CARFORTHIP Admin
             </Link>
           </div>
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-2">
             {navLinks.map((link) => (
-              <Link
-                key={link.name}
-                href={link.href}
-                className={`px-3 py-2 rounded-md text-sm font-medium ${
-                  pathname === link.href
-                    ? "bg-slate-800 text-white"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                {link.name}
-              </Link>
+              <NavLink key={link.name} link={link} currentPath={pathname} />
             ))}
           </div>
           <div className="flex items-center">
@@ -129,9 +181,8 @@ export default function AdminNavbar({
                       notifications.map((notif) => (
                         <li
                           key={notif.id}
-                          className={`p-3 border-b hover:bg-gray-50 ${
-                            !notif.isRead ? "bg-blue-50" : ""
-                          }`}
+                          className={`p-3 border-b hover:bg-gray-50 ${!notif.isRead ? "bg-blue-50" : ""
+                            }`}
                         >
                           <p className="text-sm text-gray-800">
                             {notif.message}
