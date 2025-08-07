@@ -14,23 +14,8 @@ const SettingsCard = ({ title, children }) => (
     </div>
 );
 
-const TimeInput = ({ label, value, onChange, name }) => (
-    <div>
-        <label htmlFor={name} className="block text-sm font-medium text-gray-700">{label}</label>
-        <input
-            type="time"
-            id={name}
-            name={name}
-            value={value}
-            onChange={onChange}
-            className="mt-1 w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-        />
-    </div>
-);
-
 export default function AdminSettingsPage() {
-    const [settings, setSettings] =  useState({
-        reportSendTime: '08:00',
+    const [settings, setSettings] = useState({
         reportRecipients: [],
     });
     const [allAdmins, setAllAdmins] = useState([]);
@@ -65,11 +50,6 @@ export default function AdminSettingsPage() {
         };
         fetchInitialData();
     }, []);
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setSettings(prev => ({ ...prev, [name]: value }));
-    };
     
     const handleRecipientChange = (e) => {
         const { value, checked } = e.target;
@@ -88,14 +68,13 @@ export default function AdminSettingsPage() {
         setMessage('');
 
         const settingsToSave = {
-            reportSendTime: settings.reportSendTime,
             reportRecipients: settings.reportRecipients || [],
         };
 
         try {
             const result = await saveNotificationSettings(settingsToSave);
             if (result.success) {
-                setMessage('บันทึกการตั้งค่าสำเร็จ!');
+                setMessage('บันทึกผู้รับ Report สำเร็จ!');
             } else {
                 throw new Error(result.error);
             }
@@ -134,12 +113,12 @@ export default function AdminSettingsPage() {
             <h1 className="text-3xl font-bold text-slate-800 mb-6">ตั้งค่าระบบ</h1>
             <div className="max-w-2xl mx-auto space-y-6">
                 <SettingsCard title="ตั้งค่า Report สรุปรายวัน">
-                    <TimeInput
-                        label="เวลาส่ง Report ประจำวัน (เวลาประเทศไทย)"
-                        name="reportSendTime"
-                        value={settings.reportSendTime}
-                        onChange={handleChange}
-                    />
+                    <div className='text-sm text-gray-600 bg-yellow-50 p-3 rounded-lg border border-yellow-200'>
+                        <p className='font-bold'>หมายเหตุ:</p>
+                        <p>
+                            เวลาในการส่ง Report อัตโนมัติถูกกำหนดไว้ในไฟล์ `vercel.json` หากต้องการเปลี่ยนเวลา กรุณาติดต่อผู้พัฒนาเพื่อแก้ไขโค้ดและ Deploy ใหม่
+                        </p>
+                    </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700">เลือกผู้รับ Report</label>
                         <div className="mt-2 space-y-2 border p-4 rounded-md max-h-48 overflow-y-auto">
