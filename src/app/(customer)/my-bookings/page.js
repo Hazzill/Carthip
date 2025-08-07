@@ -2,10 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-// --- 1. เพิ่มการ import ที่จำเป็นสำหรับ Firebase ---
-import { auth, db } from '@/app/lib/firebase';
-import { signInWithCustomToken } from 'firebase/auth';
-// --- สิ้นสุดการเพิ่ม ---
+import { db } from '@/app/lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import Image from 'next/image';
 import { useLiffContext } from '@/context/LiffProvider';
@@ -89,6 +86,7 @@ const ProgressBar = ({ status }) => {
 
 const BookingCard = ({ job, onCancel, isCancelling }) => {
     const handleReportIssue = () => {
+        // This can be replaced with a proper notification
         onCancel.showNotification({
             show: true,
             title: 'ฟังก์ชันยังไม่พร้อม',
@@ -197,15 +195,12 @@ const DetailRow = ({ label, value }) => (
 );
 
 export default function MyBookingsPage() {
-    const { profile, liffObject, loading: liffLoading, error: liffError } = useLiffContext();
+    const { profile, loading: liffLoading, error: liffError } = useLiffContext();
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isCancelling, setIsCancelling] = useState(false);
     const [notification, setNotification] = useState({ show: false, title: '', message: '', type: 'success' });
     const [cancelModal, setCancelModal] = useState({ show: false, bookingId: null });
-    
-    // --- 2. เพิ่ม State เพื่อรอ Firebase ---
-    const [isFirebaseReady, setIsFirebaseReady] = useState(false);
 
     useEffect(() => {
         if (notification.show) {
@@ -216,47 +211,9 @@ export default function MyBookingsPage() {
         }
     }, [notification]);
 
-    // --- 3. เพิ่ม useEffect ใหม่สำหรับ Firebase Login ---
     useEffect(() => {
-        if (liffLoading || !profile || !liffObject) return;
-
-        if (auth.currentUser) {
-            setIsFirebaseReady(true);
-            return;
-        }
-        
-        const loginToFirebase = async () => {
-            try {
-                const idToken = liffObject.getIDToken();
-                // **หมายเหตุ:** ใน Production ควรสร้าง API Route สำหรับสร้าง Custom Token
-                // เพื่อความปลอดภัย แต่สำหรับวิธีที่ง่ายที่สุด เราจะข้ามส่วนนั้นไปก่อน
-                // สมมติว่ามี /api/firebase-custom-token อยู่แล้ว
-                const response = await fetch('/api/firebase-custom-token', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ idToken }),
-                });
-
-                if (!response.ok) throw new Error('Failed to get custom token');
-
-                const { customToken } = await response.json();
-                await signInWithCustomToken(auth, customToken);
-                
-                setIsFirebaseReady(true); // ตั้งค่าเมื่อ Firebase พร้อม
-            } catch (err) {
-                console.error("Firebase login failed:", err);
-                setNotification({ show: true, title: 'Login Error', message: err.message, type: 'error' });
-            }
-        };
-
-        loginToFirebase();
-
-    }, [profile, liffObject, liffLoading]);
-
-    // --- 4. แก้ไข useEffect เดิมให้รอ isFirebaseReady ---
-    useEffect(() => {
-        if (!isFirebaseReady || !profile?.userId) {
-            if (!liffLoading && !isFirebaseReady) setLoading(false);
+        if (liffLoading || !profile?.userId) {
+            if (!liffLoading) setLoading(false);
             return;
         }
 
@@ -289,7 +246,7 @@ export default function MyBookingsPage() {
         });
 
         return () => unsubscribe();
-    }, [isFirebaseReady, profile]); // <-- เปลี่ยน dependency เป็น isFirebaseReady
+    }, [profile, liffLoading]);
 
     const handleCancelBooking = async () => {
         if (!cancelModal.bookingId || !profile || !profile.userId) {
