@@ -6,11 +6,11 @@ import { db } from '@/app/lib/firebase';
 import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import Image from 'next/image';
 import { useLiffContext } from '@/context/LiffProvider';
-import { sendLineMessage } from '@/app/actions/lineActions';
 import { updateBookingStatusByDriver } from '@/app/actions/bookingActions';
 import { registerLineIdToDriver } from '@/app/actions/driverActions';
+import { Notification } from '@/app/components/common/NotificationComponent';
 
-// --- (Components เดิม: UpdateStatusModal, ProgressBar คงไว้เหมือนเดิม) ---
+// --- (UpdateStatusModal, ProgressBar - No Changes) ---
 function UpdateStatusModal({ job, onClose, onUpdate }) {
     const [status, setStatus] = useState(job.status);
     const [note, setNote] = useState('');
@@ -100,8 +100,9 @@ const ProgressBar = ({ status }) => {
     );
 };
 
-// --- Component ใหม่สำหรับหน้าลงทะเบียน ---
-function RegistrationForm({ profile, onRegisterSuccess }) {
+
+function RegistrationForm({ profile, onRegisterSuccess, showNotification }) {
+
     const [phoneNumber, setPhoneNumber] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -117,8 +118,17 @@ function RegistrationForm({ profile, onRegisterSuccess }) {
         try {
             const result = await registerLineIdToDriver(phoneNumber, profile.userId);
             if (result.success) {
-                alert(result.message);
-                onRegisterSuccess();
+                
+                showNotification({ 
+                    show: true, 
+                    title: 'สำเร็จ', 
+                    message: result.message, 
+                    type: 'success' 
+                });
+                setTimeout(() => {
+                    onRegisterSuccess();
+                }, 1500); // หน่วงเวลาเล็กน้อยเพื่อให้ user เห็นข้อความ
+                
             } else {
                 setError(result.error);
             }
@@ -166,6 +176,18 @@ export default function DriverDashboardPage() {
     const [isRegistered, setIsRegistered] = useState(false);
     const [loading, setLoading] = useState(true);
     const [selectedJob, setSelectedJob] = useState(null);
+    
+    const [notification, setNotification] = useState({ show: false, title: '', message: '', type: 'success' });
+
+    useEffect(() => {
+        if (notification.show) {
+            const timer = setTimeout(() => {
+                setNotification({ show: false, title: '', message: '', type: 'success' });
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [notification]);
+ 
 
     useEffect(() => {
         if (liffLoading || !profile?.userId) {
@@ -229,26 +251,6 @@ export default function DriverDashboardPage() {
             if (!result.success) {
                 throw new Error(result.error);
             }
-
-            let customerMessage = '';
-            switch (newStatus) {
-                case 'stb':
-                    customerMessage = `คนขับรถถึงจุดนัดรับแล้วค่ะ กรุณาเตรียมพร้อมสำหรับการเดินทาง`;
-                    break;
-                case 'pickup':
-                    customerMessage = `คนขับได้รับคุณขึ้นรถแล้ว ขอให้เดินทางโดยสวัสดิภาพค่ะ`;
-                    break;
-                case 'completed':
-                    customerMessage = `เดินทางถึงที่หมายเรียบร้อยแล้ว ขอบคุณที่ใช้บริการ CARFORTHIP ค่ะ`;
-                    break;
-                case 'noshow':
-                    customerMessage = `คนขับไม่พบคุณที่จุดนัดรับตามเวลาที่กำหนด หากมีข้อสงสัยกรุณาติดต่อแอดมินค่ะ`;
-                    break;
-            }
-
-            if (job.userId && customerMessage) {
-                await sendLineMessage(job.userId, customerMessage);
-            }
         } catch (error) {
             console.error("Error updating status: ", error);
             alert("เกิดข้อผิดพลาดในการอัปเดตสถานะ: " + error.message);
@@ -264,12 +266,14 @@ export default function DriverDashboardPage() {
 
     return (
         <main className="p-4">
+            <Notification {...notification} />
             {selectedJob && <UpdateStatusModal job={selectedJob} onClose={() => setSelectedJob(null)} onUpdate={handleUpdateStatus} />}
             
             {!isRegistered ? (
                 <RegistrationForm 
                     profile={profile} 
                     onRegisterSuccess={() => setIsRegistered(true)}
+                    showNotification={setNotification}
                 />
             ) : (
                 <>
@@ -291,21 +295,31 @@ export default function DriverDashboardPage() {
                                 return (
                                     <div key={job.id} className="bg-white rounded-lg shadow p-4 space-y-3">
                                         <div className="flex items-start space-x-4">
-                                            <Image src={job.vehicleInfo.imageUrl || '/placeholder.png'} alt="car" width={70} height={70} className="rounded-md object-cover flex-shrink-0"/>
+                                            <Image src={job.vehicleInfo.imageUrl || '/placeholder.png'} alt="car" width={80} height={80} className="rounded-md object-cover flex-shrink-0"/>
                                             <div className="flex-grow">
                                                 <p className="font-bold">{job.vehicleInfo.brand} {job.vehicleInfo.model}</p>
                                                 <p className="text-sm text-gray-500">
                                                     {job.pickupInfo.dateTime.toDate().toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
                                                     , {job.pickupInfo.dateTime.toDate().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.
                                                 </p>
+                                                <div className="text-xs text-gray-600 mt-1 flex items-center space-x-3">
+                                                    <span>ผู้โดยสาร: {job.tripDetails.passengers}</span>
+                                                    <span>กระเป๋า: {job.tripDetails.bags}</span>
+                                                    <span>ชั่วโมง: {job.tripDetails.rentalHours}</span>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="border-t border-b border-gray-100 py-3 text-sm">
-                                            <p><strong>รับที่:</strong> {job.pickupInfo.address}</p>
-                                            <p><strong>ส่งที่:</strong> {job.dropoffInfo.address}</p>
-                                            <div className="mt-2">
-                                                <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-semibold hover:underline">
+                                        <div className="border-t border-b border-gray-100 py-3 text-sm space-y-2">
+                                            <div>
+                                                <p><strong>รับที่:</strong> {job.pickupInfo.address}</p>
+                                                <p><strong>ส่งที่:</strong> {job.dropoffInfo.address}</p>
+                                            </div>
+                                            <div className="flex items-center justify-between pt-2">
+                                                 <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-semibold hover:underline">
                                                     ดูเส้นทางใน Google Maps
+                                                </a>
+                                                <a href={`tel:${job.customerInfo.phone}`} className="bg-blue-500 text-white px-4 py-1 rounded-full text-xs font-semibold">
+                                                    โทรหาลูกค้า
                                                 </a>
                                             </div>
                                         </div>

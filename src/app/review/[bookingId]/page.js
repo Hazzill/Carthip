@@ -4,6 +4,8 @@ import { useState, useEffect, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useLiffContext } from '@/context/LiffProvider';
 import { submitReview } from '@/app/actions/reviewActions';
+import { db } from '@/app/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 // Star Rating Component
 const StarRating = ({ rating, setRating }) => {
@@ -21,7 +23,7 @@ const StarRating = ({ rating, setRating }) => {
                         fill="currentColor"
                         viewBox="0 0 20 20"
                     >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.16c.969 0 1.371 1.24.588 1.81l-3.363 2.44a1 1 0 00-.364 1.118l1.287 3.957c.3.921-.755 1.688-1.539 1.118l-3.362-2.44a1 1 0 00-1.176 0l-3.362 2.44c-.783.57-1.838-.197-1.539-1.118l1.287-3.957a1 1 0 00-.364-1.118L2.07 9.39c-.783-.57-.38-1.81.588-1.81h4.16a1 1 0 00.95-.69L9.049 2.927z" />
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.16c.969 0 1.371 1.24.588 1.81l-3.363 2.44a1 1 0 00-.364 1.118l1.287 3.957c.3.921-.755 1.688-1.539 1.118l-3.362-2.44a1 1 0 00-1.176 0l-3.362-2.44c-.783.57-1.838-.197-1.539-1.118l1.287-3.957a1 1 0 00-.364-1.118L2.07 9.39c-.783-.57-.38-1.81.588-1.81h4.16a1 1 0 00.95-.69L9.049 2.927z" />
                     </svg>
                 </button>
             ))}
@@ -37,21 +39,18 @@ function ReviewContent() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
     const [bookingId, setBookingId] = useState(null);
+    const [booking, setBooking] = useState(null); 
 
     const params = useParams();
     const searchParams = useSearchParams();
-    const router = useRouter();
 
     useEffect(() => {
         const getBookingId = () => {
-            // 1. Try to get bookingId from the dynamic route parameter first
             if (params.bookingId) {
                 return params.bookingId;
             }
-            // 2. If not found, try to get it from liff.state after a redirect
             const liffState = searchParams.get('liff.state');
             if (liffState) {
-                // Example liffState: "/review/some-booking-id"
                 const parts = liffState.split('/');
                 if (parts.length > 2 && parts[1] === 'review') {
                     return parts[2];
@@ -63,6 +62,16 @@ function ReviewContent() {
         const id = getBookingId();
         if (id) {
             setBookingId(id);
+            const fetchBooking = async () => {
+                const bookingRef = doc(db, 'bookings', id);
+                const bookingSnap = await getDoc(bookingRef);
+                if (bookingSnap.exists()) {
+                    setBooking(bookingSnap.data());
+                } else {
+                    setError('ไม่พบข้อมูลการจอง');
+                }
+            };
+            fetchBooking();
         } else if (!liffLoading) {
             setError('ไม่พบ Booking ID');
         }
@@ -75,8 +84,8 @@ function ReviewContent() {
             setError('กรุณาให้คะแนนอย่างน้อย 1 ดาว');
             return;
         }
-        if (!profile?.userId) {
-            setError('ไม่สามารถระบุตัวตนผู้ใช้ได้ กรุณาลองอีกครั้ง');
+        if (!profile?.userId || !booking) { 
+            setError('ไม่สามารถระบุตัวตนหรือข้อมูลการจองได้');
             return;
         }
         setIsSubmitting(true);
@@ -85,6 +94,7 @@ function ReviewContent() {
         const reviewData = {
             bookingId: bookingId,
             userId: profile.userId,
+            driverId: booking.driverId || null,
             rating: rating,
             comment: comment,
         };
@@ -98,7 +108,7 @@ function ReviewContent() {
         }
         setIsSubmitting(false);
     };
-
+    
     if (liffLoading) {
         return <div className="p-4 text-center">กำลังโหลด...</div>
     }

@@ -8,7 +8,7 @@ function DriverHeader() {
 
     if (loading || error) {
         return (
-            <header className="bg-white p-4 shadow-sm flex items-center space-x-3">
+            <header className="bg-[#22252A] text-white p-2 m-4 shadow-lg flex items-center space-x-4 rounded-full animate-pulse">
                 <div className="w-12 h-12 rounded-full bg-gray-300 animate-pulse"></div>
                 <div>
                     <p className="font-semibold">พนักงานขับรถ</p>
@@ -19,7 +19,7 @@ function DriverHeader() {
     }
 
     return (
-        <header className="bg-white p-4 shadow-sm flex items-center space-x-3">
+        <header className="bg-[#22252A] text-white p-2  m-4 shadow-lg flex items-center space-x-4 rounded-full">
             {profile?.pictureUrl && (
                 <Image src={profile.pictureUrl} width={48} height={48} alt="Driver Profile" className="w-12 h-12 rounded-full"/>
             )}
@@ -37,7 +37,7 @@ export default function DriverLayout({ children }) {
 
     return (
         <LiffProvider liffId={driverLiffId}>
-            <div className="max-w-md mx-auto bg-gray-200 min-h-screen">
+            <div className="max-w-md mx-auto min-h-screen">
                 <DriverHeader />
                 {children}
             </div>

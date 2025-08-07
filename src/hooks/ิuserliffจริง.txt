@@ -1,0 +1,46 @@
+// src/hooks/useLiff.js
+"use client";
+
+import { useState, useEffect } from 'react';
+
+const useLiff = () => {
+    const [liffObject, setLiffObject] = useState(null);
+    const [profile, setProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        const initializeLiff = async () => {
+            try {
+                // Dynamically import the LIFF SDK
+                const liff = (await import('@line/liff')).default;
+                
+                // Initialize the LIFF app with your LIFF ID
+                await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
+
+                if (!liff.isLoggedIn()) {
+                    // If not logged in, redirect to LINE login
+                    liff.login();
+                    return; // Stop execution after redirect
+                }
+
+                // Get user profile
+                const userProfile = await liff.getProfile();
+                setProfile(userProfile);
+                setLiffObject(liff);
+
+            } catch (err) {
+                console.error("LIFF initialization failed", err);
+                setError(err.toString());
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        initializeLiff();
+    }, []);
+
+    return { liffObject, profile, loading, error };
+};
+
+export default useLiff;
