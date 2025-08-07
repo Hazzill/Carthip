@@ -2,7 +2,9 @@
 
 import { db } from '@/app/lib/firebaseAdmin';
 import { sendLineMessage } from './lineActions';
-import { Timestamp } from 'firebase-admin/firestore';
+// --- [!code focus start] ---
+import { Timestamp, FieldPath } from 'firebase-admin/firestore'; // 1. Import FieldPath
+// --- [!code focus end] ---
 
 /**
  * Generates and sends a daily report to selected admins.
@@ -24,10 +26,13 @@ export async function sendDailyReportNow() {
 
     // 2. ดึงข้อมูล lineUserId ของแอดมินที่ต้องรับ Report
     const adminsRef = db.collection('admins');
-    const adminsSnapshot = await adminsRef.where('uid', 'in', recipientUids).get();
+    // --- [!code focus start] ---
+    // 2. แก้ไข query ให้ค้นหาจาก Document ID แทนฟิลด์ 'uid'
+    const adminsSnapshot = await adminsRef.where(FieldPath.documentId(), 'in', recipientUids).get();
+    // --- [!code focus end] ---
     const recipientLineIds = adminsSnapshot.docs
         .map(doc => doc.data().lineUserId)
-        .filter(Boolean); // กรองเอาเฉพาะคนที่มี lineUserId
+        .filter(Boolean);
 
     if (recipientLineIds.length === 0) {
         return { success: true, message: "ผู้รับที่เลือกไม่มี Line User ID" };
