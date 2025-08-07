@@ -14,8 +14,23 @@ const SettingsCard = ({ title, children }) => (
     </div>
 );
 
+const TimeInput = ({ label, value, onChange, name }) => (
+    <div>
+        <label htmlFor={name} className="block text-sm font-medium text-gray-700">{label}</label>
+        <input
+            type="time"
+            id={name}
+            name={name}
+            value={value}
+            onChange={onChange}
+            className="mt-1 w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+        />
+    </div>
+);
+
 export default function AdminSettingsPage() {
     const [settings, setSettings] = useState({
+        reportSendTime: '08:00',
         reportRecipients: [],
     });
     const [allAdmins, setAllAdmins] = useState([]);
@@ -50,6 +65,11 @@ export default function AdminSettingsPage() {
         };
         fetchInitialData();
     }, []);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setSettings(prev => ({ ...prev, [name]: value }));
+    };
     
     const handleRecipientChange = (e) => {
         const { value, checked } = e.target;
@@ -68,6 +88,7 @@ export default function AdminSettingsPage() {
         setMessage('');
 
         const settingsToSave = {
+            reportSendTime: settings.reportSendTime,
             reportRecipients: settings.reportRecipients || [],
         };
 
@@ -113,13 +134,12 @@ export default function AdminSettingsPage() {
             <h1 className="text-3xl font-bold text-slate-800 mb-6">ตั้งค่าระบบ</h1>
             <div className="max-w-2xl mx-auto space-y-6">
                 <SettingsCard title="ตั้งค่า Report สรุปรายวัน">
-                    <div className='text-sm text-gray-600 bg-gray-50 p-3 rounded-lg'>
-                        <p>
-                            <strong>ตั้งค่าเวลาส่ง Report:</strong> 
-                            เวลาจะถูกกำหนดในไฟล์ `vercel.json` ปัจจุบันตั้งไว้ที่ <span className='font-mono bg-gray-200 px-1 rounded'>0 1 * * *</span> 
-                            (ประมาณ 08:00 น. เวลาไทย) หากต้องการเปลี่ยนเวลา กรุณาแก้ไขไฟล์ดังกล่าว
-                        </p>
-                    </div>
+                    <TimeInput
+                        label="เวลาส่ง Report ประจำวัน (GMT+7)"
+                        name="reportSendTime"
+                        value={settings.reportSendTime}
+                        onChange={handleChange}
+                    />
                     <div>
                         <label className="block text-sm font-medium text-gray-700">เลือกผู้รับ Report</label>
                         <div className="mt-2 space-y-2 border p-4 rounded-md max-h-48 overflow-y-auto">
