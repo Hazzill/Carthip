@@ -29,7 +29,7 @@ const TimeInput = ({ label, value, onChange, name }) => (
 );
 
 export default function AdminSettingsPage() {
-    const [settings, setSettings] = useState({
+    const [settings, setSettings] = = useState({
         reportSendTime: '08:00',
         reportRecipients: [],
     });
@@ -135,7 +135,7 @@ export default function AdminSettingsPage() {
             <div className="max-w-2xl mx-auto space-y-6">
                 <SettingsCard title="ตั้งค่า Report สรุปรายวัน">
                     <TimeInput
-                        label="เวลาส่ง Report ประจำวัน (GMT+7)"
+                        label="เวลาส่ง Report ประจำวัน (เวลาประเทศไทย)"
                         name="reportSendTime"
                         value={settings.reportSendTime}
                         onChange={handleChange}
